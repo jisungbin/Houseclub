@@ -1,21 +1,15 @@
-package me.grishka.houseclub;
+package me.grishka.houseclub
 
-import androidx.annotation.Nullable;
+import me.grishka.houseclub.api.model.Channel
 
-import java.util.Objects;
-
-import me.grishka.houseclub.api.model.Channel;
-
-class DataProvider {
-    private static Channel channelCache = null;
-
-    @Nullable
-    public static Channel getChannel(String id) {
-        if (channelCache == null) return null;
-        return Objects.equals(channelCache.channel, id) ? channelCache : null;
+internal object DataProvider {
+    private var channelCache: Channel? = null
+    fun getChannel(id: String?): Channel? {
+        if (channelCache == null) return null
+        return if (channelCache!!.channel == id) channelCache else null
     }
 
-    public static void saveChannel(Channel channel) {
-        channelCache = channel;
+    fun saveChannel(channel: Channel?) {
+        channelCache = channel
     }
 }
