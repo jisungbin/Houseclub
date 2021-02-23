@@ -1,5 +1,5 @@
 # Unofficial Clubhouse app for Android.
-> Remaster version 
+> Remaster version [original](https://github.com/grishka/Houseclub)
 
 ## What is Changed?
 1. Designed like iOS clubhouse.
