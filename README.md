@@ -3,5 +3,5 @@
 > 
 ### What is Changed?
 1. Designed like iOS clubhouse.
-2. Mirgrated Java to Kotlin
+2. Migrated Java to Kotlin
 3. Code clea-up
