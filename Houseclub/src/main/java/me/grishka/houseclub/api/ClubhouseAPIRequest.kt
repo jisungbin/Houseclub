@@ -7,7 +7,6 @@ import java.io.File
 import java.lang.reflect.Type
 import java.util.HashMap
 import me.grishka.appkit.api.APIRequest
-import me.grishka.appkit.api.ErrorResponse
 import me.grishka.houseclub.R
 import okhttp3.Call
 
@@ -31,7 +30,7 @@ abstract class ClubhouseAPIRequest<T>(
     }
 
     override fun exec(): APIRequest<T> {
-        ClubhouseAPIController.Companion.getInstance().execRequest(this)
+        ClubhouseAPIController.instance!!.execRequest(this)
         if (progress != null) progress!!.show()
         return this
     }
@@ -76,7 +75,7 @@ abstract class ClubhouseAPIRequest<T>(
         invokeSuccessCallback(result)
     }
 
-    fun onError(result: ErrorResponse?) {
+    fun onError(result: ClubhouseErrorResponse) {
         if (progress != null) uiThreadHandler.post { dismissProgressDialog() }
         invokeErrorCallback(result)
     }

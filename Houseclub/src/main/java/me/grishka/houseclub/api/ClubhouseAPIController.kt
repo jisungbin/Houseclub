@@ -1,63 +1,67 @@
 package me.grishka.houseclub.api
 
 import android.net.Uri
-import android.util.Log
+import com.google.gson.FieldNamingPolicy
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import me.grishka.appkit.utils.WorkerThread
-import me.grishka.houseclub.BuildConfig
-import okhttp3.Call
-import okhttp3.MediaType
+import me.grishka.houseclub.App
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class ClubhouseAPIController private constructor() {
-    private val apiThread: WorkerThread
+    private val apiThread: WorkerThread = WorkerThread("ApiThread")
     private val gson: Gson =
         GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").disableHtmlEscaping()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create()
-    private val httpClient: OkHttpClient = OkHttpClient.Builder().build()
+    private val httpClient = OkHttpClient.Builder().build()
+
     fun <T> execRequest(req: ClubhouseAPIRequest<T>) {
         apiThread.postRunnable(RequestRunnable(req), 0)
     }
 
-    fun getGson(): Gson {
-        return gson
-    }
+    fun getGson() = gson
 
     private inner class RequestRunnable<T>(private val req: ClubhouseAPIRequest<T>) : Runnable {
         override fun run() {
             try {
                 if (req.canceled) return
-                val uri = API_URL.buildUpon().appendPath(
-                    req.path)
+                val uri = API_URL.buildUpon().appendPath(req.path)
                 if (req.queryParams != null) {
                     for ((key, value) in req.queryParams!!) {
                         uri.appendQueryParameter(key, value)
                     }
                 }
                 req.prepare()
+
                 var reqBody: RequestBody? = null
                 if (req.requestBody != null) {
-                    reqBody = RequestBody.create(MediaType.get("application/json; charset=utf-8"),
-                        gson.toJson(
-                            req.requestBody))
+                    reqBody = gson.toJson(
+                        req.requestBody
+                    ).toRequestBody("application/json; charset=utf-8".toMediaType())
                 } else if (req.fileToUpload != null && req.fileFieldName != null) {
                     reqBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
-                        .addFormDataPart(req.fileFieldName,
+                        .addFormDataPart(
+                            req.fileFieldName!!,
                             req.fileToUpload!!.name,
-                            RequestBody.create(
-                                MediaType.get(
-                                    req.fileMimeType), req.fileToUpload))
+                            req.fileToUpload!!.asRequestBody(req.fileMimeType!!.toMediaType())
+                        )
                         .build()
                 } else if (req.contentUriToUpload != null && req.fileFieldName != null) {
                     val part = ContentUriRequestBody(req.contentUriToUpload)
                     reqBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
-                        .addFormDataPart(req.fileFieldName, part.fileName, part)
+                        .addFormDataPart(req.fileFieldName!!, part.fileName, part)
                         .build()
                 }
-                if (DEBUG) Log.i(TAG, "Sending: " + req.method + " " + uri)
-                val bldr = Request.Builder()
-                    .url(uri.build().toString())
+
+                val bldr = Request.Builder().url(uri.build().toString())
                 if ("POST" == req.method && reqBody == null) {
                     val fld = bldr.javaClass.getDeclaredField("method")
                     fld.isAccessible = true
@@ -65,49 +69,43 @@ class ClubhouseAPIController private constructor() {
                 } else {
                     bldr.method(req.method, reqBody)
                 }
-                val locales: LocaleList =
-                    App.Companion.applicationContext.getResources().getConfiguration().getLocales()
+
+                val locales = App.context.resources.configuration.locales
                 bldr.header("CH-Languages", locales.toLanguageTags())
                     .header("CH-Locale", locales.get(0).toLanguageTag().replace('-', '_'))
                     .header("Accept", "application/json")
                     .header("CH-AppBuild", API_BUILD_ID)
                     .header("CH-AppVersion", API_BUILD_VERSION)
                     .header("User-Agent", API_UA)
-                    .header("CH-DeviceId", ClubhouseSession.deviceID)
-                if (ClubhouseSession.isLoggedIn()) {
+                    .header("CH-DeviceId", ClubhouseSession.deviceID!!)
+
+                if (ClubhouseSession.isLoggedIn) {
                     bldr.header("Authorization", "Token " + ClubhouseSession.userToken)
-                        .header("CH-UserID", ClubhouseSession.userID)
+                        .header("CH-UserID", ClubhouseSession.userID!!)
                 }
-                val call: Call = httpClient.newCall(bldr.build())
-                if (DEBUG) Log.i(TAG, call.request().headers().toString())
+
+                val call = httpClient.newCall(bldr.build())
                 req.currentRequest = call
                 call.execute().use { resp ->
-                    val body: ResponseBody? = resp.body()
-                    if (DEBUG) Log.i(TAG, "Code: " + resp.code())
-                    if (resp.code() == 200) {
-                        val respStr: String = body.string()
-                        if (DEBUG) Log.i(TAG, "Raw response: $respStr")
-                        //						T robj=gson.fromJson(body.charStream(), req.responseClass);
+                    val body = resp.body
+                    if (resp.code == 200) {
+                        val respStr = body!!.string()
                         val robj = req.parse(respStr)
-                        if (DEBUG) Log.i(TAG, "Parsed response: $robj")
                         req.onSuccess(robj)
                     } else {
-                        val respStr: String = body.string()
-                        if (DEBUG) Log.i(TAG, "Raw response: $respStr")
-                        val br: BaseResponse =
-                            gson.fromJson<BaseResponse>(respStr, BaseResponse::class.java)
+                        val respStr = body!!.string()
+                        val br = gson.fromJson(respStr, BaseResponse::class.java)
                         req.onError(ClubhouseErrorResponse(br))
                     }
                 }
             } catch (x: Exception) {
-                Log.w(TAG, x)
-                val msg = if (BuildConfig.DEBUG) x.localizedMessage else null
-                req.onError(ClubhouseErrorResponse(-1, msg))
+                req.onError(ClubhouseErrorResponse(-1, x.localizedMessage))
             }
         }
     }
 
     companion object {
+        @JvmStatic // TODO: non-null
         var instance: ClubhouseAPIController? = null
             get() {
                 if (field == null) {
@@ -116,11 +114,8 @@ class ClubhouseAPIController private constructor() {
                 return field
             }
             private set
-        private const val TAG = "ClubhouseAPI"
-        private val DEBUG: Boolean = BuildConfig.DEBUG
-        private val API_URL = Uri.parse("https://www.clubhouseapi.com/api")
 
-        //	private static final Uri API_URL=Uri.parse("http://192.168.0.51:8080/");
+        private val API_URL = Uri.parse("https://www.clubhouseapi.com/api")
         private const val API_BUILD_ID = "304"
         private const val API_BUILD_VERSION = "0.1.28"
         private const val API_UA = "clubhouse/" + API_BUILD_ID + " (iPhone; iOS 13.5.1; Scale/3.00)"
@@ -135,7 +130,6 @@ class ClubhouseAPIController private constructor() {
     }
 
     init {
-        apiThread = WorkerThread("ApiThread")
         apiThread.start()
     }
 }

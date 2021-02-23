@@ -13,10 +13,6 @@ class FullUser : User() {
     var isBlockedByNetwork = false
     var timeCreated: Date? = null
     var invitedByUserProfile: User? = null
-
-    // null = not following
-    // 2 = following
-    // other values = ?
     var notificationType = 0
     val isFollowed: Boolean
         get() = notificationType == 2

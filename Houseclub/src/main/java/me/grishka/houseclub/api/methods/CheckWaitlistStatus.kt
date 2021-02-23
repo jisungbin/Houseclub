@@ -2,9 +2,11 @@ package me.grishka.houseclub.api.methods
 
 import me.grishka.houseclub.api.ClubhouseAPIRequest
 
-class CheckWaitlistStatus : ClubhouseAPIRequest<CheckWaitlistStatus.Response?>("POST",
+class CheckWaitlistStatus : ClubhouseAPIRequest<CheckWaitlistStatus.Response?>(
+    "POST",
     "check_waitlist_status",
-    Response::class.java) {
+    Response::class.java
+) {
     class Response {
         var isWaitlisted = false
         var isOnboarding = false

@@ -2,9 +2,9 @@ package me.grishka.houseclub.api
 
 import android.content.Context
 import android.content.SharedPreferences
-import java.util.UUID
 import me.grishka.houseclub.App
 import me.grishka.houseclub.api.model.User
+import java.util.UUID
 
 object ClubhouseSession {
     var deviceID: String? = null
@@ -37,7 +37,9 @@ object ClubhouseSession {
         get() = userID != null
 
     private fun prefs(): SharedPreferences {
-        return App.Companion.applicationContext!!.getSharedPreferences("session",
-            Context.MODE_PRIVATE)
+        return App.context.getSharedPreferences(
+            "session",
+            Context.MODE_PRIVATE
+        )
     }
 }

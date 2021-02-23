@@ -6,39 +6,48 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
+import me.grishka.houseclub.App
+import me.grishka.houseclub.api.ClubhouseAPIRequest
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import me.grishka.houseclub.App
-import me.grishka.houseclub.api.ClubhouseAPIRequest
 
 class UpdatePhoto(private val uri: Uri?) :
     ClubhouseAPIRequest<Bitmap?>("POST", "update_photo", Bitmap::class.java) {
-    private var resizedBitmap: Bitmap? = null
+    private lateinit var resizedBitmap: Bitmap
+
     @Throws(IOException::class)
     override fun prepare() {
         var orig: Bitmap
-        App.Companion.applicationContext!!.getContentResolver().openInputStream(uri!!)
+
+        App.context!!.contentResolver.openInputStream(uri!!)
             .use { `in` -> orig = BitmapFactory.decodeStream(`in`) }
-        val size = Math.min(512, Math.min(orig.width, orig.height))
+
+        val size = 512.coerceAtMost(orig.width.coerceAtMost(orig.height))
         resizedBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val srcRect: Rect
-        srcRect = if (orig.width > orig.height) {
+
+        val srcRect: Rect = if (orig.width > orig.height) {
             val x = (orig.width - orig.height) / 2
             Rect(x, 0, x + orig.height, orig.height)
         } else {
             val y = (orig.height - orig.width) / 2
             Rect(0, y, orig.width, y + orig.width)
         }
-        Canvas(resizedBitmap).drawBitmap(orig,
+
+        Canvas(resizedBitmap).drawBitmap(
+            orig,
             srcRect,
             Rect(0, 0, size, size),
-            Paint(Paint.FILTER_BITMAP_FLAG))
-        val tmp: File = File(App.Companion.applicationContext!!.getCacheDir(), "ava_tmp.jpg")
+            Paint(Paint.FILTER_BITMAP_FLAG)
+        )
+
+        val tmp = File(App.context!!.cacheDir, "ava_tmp.jpg")
         FileOutputStream(tmp).use { out ->
-            resizedBitmap.compress(Bitmap.CompressFormat.JPEG,
+            resizedBitmap.compress(
+                Bitmap.CompressFormat.JPEG,
                 95,
-                out)
+                out
+            )
         }
         fileToUpload = tmp
         fileFieldName = "file"
@@ -46,7 +55,5 @@ class UpdatePhoto(private val uri: Uri?) :
     }
 
     @Throws(Exception::class)
-    override fun parse(resp: String?): Bitmap? {
-        return resizedBitmap
-    }
+    override fun parse(resp: String?) = resizedBitmap
 }

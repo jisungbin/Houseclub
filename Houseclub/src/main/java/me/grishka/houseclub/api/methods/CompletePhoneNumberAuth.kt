@@ -4,9 +4,11 @@ import me.grishka.houseclub.api.ClubhouseAPIRequest
 import me.grishka.houseclub.api.model.User
 
 class CompletePhoneNumberAuth(phoneNumber: String, code: String) :
-    ClubhouseAPIRequest<CompletePhoneNumberAuth.Response?>("POST",
+    ClubhouseAPIRequest<CompletePhoneNumberAuth.Response?>(
+        "POST",
         "complete_phone_number_auth",
-        Response::class.java) {
+        Response::class.java
+    ) {
     class Response {
         var authToken: String? = null
         var accessToken: String? = null

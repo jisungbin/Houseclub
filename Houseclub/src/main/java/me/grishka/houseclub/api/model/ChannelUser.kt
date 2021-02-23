@@ -3,7 +3,7 @@ package me.grishka.houseclub.api.model
 import android.os.Parcel
 import android.os.Parcelable
 
-class ChannelUser : User {
+open class ChannelUser : User {
     var isSpeaker = false
     var isModerator = false
     var isFollowedBySpeaker = false
@@ -14,9 +14,8 @@ class ChannelUser : User {
 
     @Transient
     var isMuted = false
-    override fun describeContents(): Int {
-        return 0
-    }
+
+    override fun describeContents() = 0
 
     override fun writeToParcel(dest: Parcel, flags: Int) {
         super.writeToParcel(dest, flags)
@@ -40,7 +39,7 @@ class ChannelUser : User {
         firstName = source.readString()
     }
 
-    constructor() {}
+    constructor()
     protected constructor(`in`: Parcel) : super(`in`) {
         isSpeaker = `in`.readByte().toInt() != 0
         isModerator = `in`.readByte().toInt() != 0
@@ -52,14 +51,10 @@ class ChannelUser : User {
     }
 
     companion object {
-        val CREATOR: Parcelable.Creator<ChannelUser> = object : Parcelable.Creator<ChannelUser?> {
-            override fun createFromParcel(source: Parcel): ChannelUser? {
-                return ChannelUser(source)
-            }
-
-            override fun newArray(size: Int): Array<ChannelUser?> {
-                return arrayOfNulls(size)
-            }
+        @JvmField
+        val CREATOR = object : Parcelable.Creator<ChannelUser?> {
+            override fun createFromParcel(source: Parcel) = ChannelUser(source)
+            override fun newArray(size: Int) = arrayOfNulls<ChannelUser?>(size)
         }
     }
 }

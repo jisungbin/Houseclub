@@ -2,38 +2,35 @@ package me.grishka.houseclub.api
 
 import android.net.Uri
 import android.provider.OpenableColumns
-import java.io.IOException
 import me.grishka.houseclub.App
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import okio.BufferedSink
-import okio.Okio
+import okio.source
+import java.io.IOException
 
 class ContentUriRequestBody(private val uri: Uri?) : RequestBody() {
-    private var size: Long = 0
+    private var size = 0L
     var fileName: String? = null
-    @Throws(IOException::class)
-    override fun contentLength(): Long {
-        return size
-    }
 
-    override fun contentType(): MediaType? {
-        return MediaType.get(App.Companion.applicationContext!!.getContentResolver().getType(
-            uri!!))
-    }
+    @Throws(IOException::class)
+    override fun contentLength() = size
+
+    override fun contentType() = App.context.contentResolver.getType(uri!!)?.toMediaType()
 
     @Throws(IOException::class)
     override fun writeTo(sink: BufferedSink) {
-        Okio.source(App.Companion.applicationContext!!.getContentResolver().openInputStream(uri!!))
-            .use { source -> sink.writeAll(source) }
+        App.context.contentResolver.openInputStream(uri!!)?.let {
+            it.source().use { source -> sink.writeAll(source) }
+        }
     }
 
     init {
-        App.Companion.applicationContext!!.getContentResolver().query(uri!!, null, null, null, null)
+        App.context.contentResolver.query(uri!!, null, null, null, null)
             .use { cursor ->
                 cursor!!.moveToFirst()
-                size = cursor!!.getLong(cursor!!.getColumnIndex(OpenableColumns.SIZE))
-                fileName = cursor!!.getString(cursor!!.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+                size = cursor.getLong(cursor.getColumnIndex(OpenableColumns.SIZE))
+                fileName = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
             }
     }
 }

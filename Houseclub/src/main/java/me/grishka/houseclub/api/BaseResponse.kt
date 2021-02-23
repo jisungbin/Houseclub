@@ -5,8 +5,8 @@ class BaseResponse {
     var errorMessage: String? = null
     override fun toString(): String {
         return "BaseResponse{" +
-                "success=" + success +
-                ", errorMessage='" + errorMessage + '\'' +
-                '}'
+            "success=" + success +
+            ", errorMessage='" + errorMessage + '\'' +
+            '}'
     }
 }

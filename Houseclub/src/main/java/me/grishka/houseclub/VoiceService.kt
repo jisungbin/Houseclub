@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import com.google.gson.JsonObject
@@ -27,9 +26,6 @@ import com.pubnub.api.models.consumer.pubsub.message_actions.PNMessageActionResu
 import io.agora.rtc.Constants
 import io.agora.rtc.IRtcEngineEventHandler
 import io.agora.rtc.RtcEngine
-import java.util.ArrayList
-import java.util.Arrays
-import java.util.stream.Collectors
 import me.grishka.appkit.api.Callback
 import me.grishka.appkit.api.ErrorResponse
 import me.grishka.houseclub.api.BaseResponse
@@ -41,51 +37,62 @@ import me.grishka.houseclub.api.methods.JoinChannel
 import me.grishka.houseclub.api.methods.LeaveChannel
 import me.grishka.houseclub.api.model.Channel
 import me.grishka.houseclub.api.model.ChannelUser
+import java.util.ArrayList
+import java.util.Arrays
+import java.util.stream.Collectors
 
 class VoiceService : Service() {
-    private var engine: RtcEngine? = null
     var channel: Channel? = null
         private set
+
     var isMuted = true
         set(muted) {
             field = muted
             engine!!.muteLocalAudioStream(muted)
         }
-    private val uiHandler = Handler(Looper.getMainLooper())
-    private val pinger: Runnable = object : Runnable {
+
+    private val pinger = object : Runnable {
         override fun run() {
             ActivePing(channel!!.channel).exec()
             uiHandler.postDelayed(this, 30000)
         }
     }
+
     var isHandRaised = false
         private set
-    private var pubnub: PubNub? = null
-    private val mutedUserIds = ArrayList<Int>()
+
     var isSelfSpeaker = false
         private set
+
     var isSelfModerator = false
         private set
 
-    override fun onBind(intent: Intent): IBinder? {
-        return null
-    }
+    private var pubnub: PubNub? = null
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var engine: RtcEngine? = null
+    private val mutedUserIds = ArrayList<Int>()
+
+    override fun onBind(intent: Intent) = null
 
     override fun onCreate() {
         super.onCreate()
         engine = try {
-            RtcEngine.create(baseContext,
-                ClubhouseAPIController.Companion.AGORA_KEY,
-                RtcEngineEventHandler())
+            RtcEngine.create(
+                baseContext,
+                ClubhouseAPIController.AGORA_KEY,
+                RtcEngineEventHandler()
+            )
         } catch (x: Exception) {
             Log.e(TAG, "Error initializing agora", x)
             stopSelf()
             return
         }
-        engine.setChannelProfile(Constants.CHANNEL_PROFILE_LIVE_BROADCASTING)
-        engine.setDefaultAudioRoutetoSpeakerphone(true)
-        engine.enableAudioVolumeIndication(500, 3, false)
-        engine.muteLocalAudioStream(true)
+        engine!!.run {
+            setChannelProfile(Constants.CHANNEL_PROFILE_LIVE_BROADCASTING)
+            setDefaultAudioRoutetoSpeakerphone(true)
+            enableAudioVolumeIndication(500, 3, false)
+            muteLocalAudioStream(true)
+        }
         instance = this
     }
 
@@ -101,20 +108,27 @@ class VoiceService : Service() {
             channel = DataProvider.getChannel(id)
             updateChannel(channel)
             val nm = getSystemService(
-                NotificationManager::class.java)
+                NotificationManager::class.java
+            )
             val n = Notification.Builder(this)
                 .setSmallIcon(R.drawable.ic_phone_in_talk)
                 .setContentTitle(getString(R.string.ongoing_call))
                 .setContentText(intent.getStringExtra("topic"))
-                .setContentIntent(PendingIntent.getActivity(this,
-                    1,
-                    Intent(this, MainActivity::class.java).putExtra("openCurrentChannel", true),
-                    PendingIntent.FLAG_UPDATE_CURRENT))
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        this,
+                        1,
+                        Intent(this, MainActivity::class.java).putExtra("openCurrentChannel", true),
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                )
             if (Build.VERSION.SDK_INT >= 26) {
                 if (nm.getNotificationChannel("ongoing") == null) {
-                    val nc = NotificationChannel("ongoing",
+                    val nc = NotificationChannel(
+                        "ongoing",
                         "Ongoing calls",
-                        NotificationManager.IMPORTANCE_LOW)
+                        NotificationManager.IMPORTANCE_LOW
+                    )
                     nm.createNotificationChannel(nc)
                 }
                 n.setChannelId("ongoing")
@@ -126,20 +140,23 @@ class VoiceService : Service() {
     }
 
     private fun doJoinChannel() {
-        engine!!.joinChannel(channel!!.token,
+        engine!!.joinChannel(
+            channel!!.token,
             channel!!.channel,
             "",
-            ClubhouseSession.userID!!.toInt())
+            ClubhouseSession.userID!!.toInt()
+        )
         uiHandler.postDelayed(pinger, 30000)
         for (l in listeners) l.onChannelUpdated(channel)
         val pnConf = PNConfiguration()
-        pnConf.subscribeKey = ClubhouseAPIController.Companion.PUBNUB_SUB_KEY
-        pnConf.publishKey = ClubhouseAPIController.Companion.PUBNUB_PUB_KEY
-        //pnConf.setUuid(UUID.randomUUID().toString());
+        pnConf.subscribeKey = ClubhouseAPIController.PUBNUB_SUB_KEY
+        pnConf.publishKey = ClubhouseAPIController.PUBNUB_PUB_KEY
         pnConf.origin = "clubhouse.pubnub.com"
         pnConf.uuid = ClubhouseSession.userID
-        pnConf.setPresenceTimeoutWithCustomInterval(channel!!.pubnubHeartbeatValue,
-            channel!!.pubnubHeartbeatInterval)
+        pnConf.setPresenceTimeoutWithCustomInterval(
+            channel!!.pubnubHeartbeatValue,
+            channel!!.pubnubHeartbeatInterval
+        )
         pnConf.authKey = channel!!.pubnubToken
         pubnub = PubNub(pnConf)
         pubnub!!.addListener(object : SubscribeCallback() {
@@ -148,8 +165,10 @@ class VoiceService : Service() {
             }
 
             override fun message(pubnub: PubNub, pnMessageResult: PNMessageResult) {
-                Log.d(TAG,
-                    "message() called with: pubnub = [$pubnub], pnMessageResult = [$pnMessageResult]")
+                Log.d(
+                    TAG,
+                    "message() called with: pubnub = [$pubnub], pnMessageResult = [$pnMessageResult]"
+                )
                 val msg = pnMessageResult.message.asJsonObject
                 val act = msg["action"].asString
                 when (act) {
@@ -160,41 +179,53 @@ class VoiceService : Service() {
             }
 
             override fun presence(pubnub: PubNub, pnPresenceEventResult: PNPresenceEventResult) {
-                Log.d(TAG,
-                    "presence() called with: pubnub = [$pubnub], pnPresenceEventResult = [$pnPresenceEventResult]")
+                Log.d(
+                    TAG,
+                    "presence() called with: pubnub = [$pubnub], pnPresenceEventResult = [$pnPresenceEventResult]"
+                )
             }
 
             override fun signal(pubnub: PubNub, pnSignalResult: PNSignalResult) {
-                Log.d(TAG,
-                    "signal() called with: pubnub = [$pubnub], pnSignalResult = [$pnSignalResult]")
+                Log.d(
+                    TAG,
+                    "signal() called with: pubnub = [$pubnub], pnSignalResult = [$pnSignalResult]"
+                )
             }
 
             override fun uuid(pubnub: PubNub, pnUUIDMetadataResult: PNUUIDMetadataResult) {}
             override fun channel(pubnub: PubNub, pnChannelMetadataResult: PNChannelMetadataResult) {
-                Log.d(TAG,
-                    "channel() called with: pubnub = [$pubnub], pnChannelMetadataResult = [$pnChannelMetadataResult]")
+                Log.d(
+                    TAG,
+                    "channel() called with: pubnub = [$pubnub], pnChannelMetadataResult = [$pnChannelMetadataResult]"
+                )
             }
 
             override fun membership(pubnub: PubNub, pnMembershipResult: PNMembershipResult) {
-                Log.d(TAG,
-                    "membership() called with: pubnub = [$pubnub], pnMembershipResult = [$pnMembershipResult]")
+                Log.d(
+                    TAG,
+                    "membership() called with: pubnub = [$pubnub], pnMembershipResult = [$pnMembershipResult]"
+                )
             }
 
             override fun messageAction(
                 pubnub: PubNub,
-                pnMessageActionResult: PNMessageActionResult
+                pnMessageActionResult: PNMessageActionResult,
             ) {
-                Log.d(TAG,
-                    "messageAction() called with: pubnub = [$pubnub], pnMessageActionResult = [$pnMessageActionResult]")
+                Log.d(
+                    TAG,
+                    "messageAction() called with: pubnub = [$pubnub], pnMessageActionResult = [$pnMessageActionResult]"
+                )
             }
 
             override fun file(pubnub: PubNub, pnFileEventResult: PNFileEventResult) {}
         })
-        pubnub!!.subscribe().channels(Arrays.asList(
-            "users." + ClubhouseSession.userID,
-            "channel_user." + channel!!.channel + "." + ClubhouseSession.userID,  //				"channel_speakers."+channel.channel,
-            "channel_all." + channel!!.channel
-        )).execute()
+        pubnub!!.subscribe().channels(
+            mutableListOf(
+                "users." + ClubhouseSession.userID,
+                "channel_user." + channel!!.channel + "." + ClubhouseSession.userID,
+                "channel_all." + channel!!.channel
+            )
+        ).execute()
     }
 
     fun leaveChannel() {
@@ -268,7 +299,8 @@ class VoiceService : Service() {
         if (ch != channel!!.channel) return
         uiHandler.post {
             for (l in listeners) l.onCanSpeak(
-                msg["from_name"].asString, msg["from_user_id"].asInt)
+                msg["from_name"].asString, msg["from_user_id"].asInt
+            )
         }
     }
 
@@ -276,8 +308,8 @@ class VoiceService : Service() {
         val ch = msg["channel"].asString
         if (ch != channel!!.channel) return
         val profile = msg.getAsJsonObject("user_profile")
-        val user: ChannelUser = ClubhouseAPIController.Companion.getInstance().getGson()
-            .fromJson<ChannelUser>(profile, ChannelUser::class.java)
+        val user: ChannelUser = ClubhouseAPIController.instance!!.getGson()
+            .fromJson(profile, ChannelUser::class.java)
         uiHandler.post {
             channel!!.users!!.add(user)
             for (l in listeners) l.onUserJoined(user)
@@ -310,8 +342,10 @@ class VoiceService : Service() {
 
     private inner class RtcEngineEventHandler : IRtcEngineEventHandler() {
         override fun onJoinChannelSuccess(channel: String, uid: Int, elapsed: Int) {
-            Log.d(TAG,
-                "onJoinChannelSuccess() called with: channel = [$channel], uid = [$uid], elapsed = [$elapsed]")
+            Log.d(
+                TAG,
+                "onJoinChannelSuccess() called with: channel = [$channel], uid = [$uid], elapsed = [$elapsed]"
+            )
         }
 
         override fun onError(err: Int) {
@@ -319,7 +353,6 @@ class VoiceService : Service() {
         }
 
         override fun onAudioVolumeIndication(speakers: Array<AudioVolumeInfo>, totalVolume: Int) {
-//			Log.d(TAG, "onAudioVolumeIndication() called with: speakers = ["+Arrays.toString(speakers)+"], totalVolume = ["+totalVolume+"]");
             uiHandler.post {
                 val selfID = ClubhouseSession.userID!!.toInt()
                 val uids = Arrays.stream(speakers)
@@ -330,7 +363,6 @@ class VoiceService : Service() {
         }
 
         override fun onUserMuteAudio(uid: Int, muted: Boolean) {
-//			Log.d(TAG, "onUserMuteAudio() called with: uid = ["+uid+"], muted = ["+muted+"]");
             uiHandler.post {
                 for (u in channel!!.users!!) {
                     if (u!!.userId == uid) {

@@ -16,9 +16,11 @@ class SquircleImageView : ImageView {
         init()
     }
 
-    constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context,
+    constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(
+        context,
         attrs,
-        defStyleAttr) {
+        defStyleAttr
+    ) {
         init()
     }
 
@@ -31,14 +33,6 @@ class SquircleImageView : ImageView {
         private val squircleOutline: ViewOutlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
                 if (view.width == 0 || view.height == 0) return
-                //			Path path=new Path();
-//			path.moveTo(0, view.getHeight()/2f);
-//			path.cubicTo(0f, 0f, 0f, 0f, view.getWidth()/2f, 0f);
-//			path.cubicTo(view.getWidth(), 0f, view.getWidth(), 0f, view.getWidth(), view.getHeight()/2f);
-//			path.cubicTo(view.getWidth(), view.getHeight(), view.getWidth(), view.getHeight(), view.getWidth()/2f, view.getHeight());
-//			path.cubicTo(0f, view.getHeight(), 0f, view.getHeight(), 0f, view.getHeight()/2f);
-//			path.close();
-//			outline.setConvexPath(path);
                 outline.setRoundRect(0, 0, view.width, view.height, view.width * 0.42f)
             }
         }

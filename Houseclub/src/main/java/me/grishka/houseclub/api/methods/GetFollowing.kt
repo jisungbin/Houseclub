@@ -1,8 +1,8 @@
 package me.grishka.houseclub.api.methods
 
-import java.util.HashMap
 import me.grishka.houseclub.api.ClubhouseAPIRequest
 import me.grishka.houseclub.api.model.FullUser
+import java.util.HashMap
 
 class GetFollowing(userID: Int, pageSize: Int, page: Int) :
     ClubhouseAPIRequest<GetFollowing.Response?>("GET", "get_following", Response::class.java) {

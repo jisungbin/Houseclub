@@ -17,7 +17,6 @@ import androidx.annotation.StringRes
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup
 import androidx.recyclerview.widget.RecyclerView
-import java.util.ArrayList
 import me.grishka.appkit.Nav
 import me.grishka.appkit.api.Callback
 import me.grishka.appkit.api.ErrorResponse
@@ -39,6 +38,7 @@ import me.grishka.houseclub.api.methods.AcceptSpeakerInvite
 import me.grishka.houseclub.api.methods.GetChannel
 import me.grishka.houseclub.api.model.Channel
 import me.grishka.houseclub.api.model.ChannelUser
+import java.util.ArrayList
 
 class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventListener {
     private var adapter: MergeRecyclerAdapter? = null
@@ -48,9 +48,9 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
     private var muteBtn: ImageButton? = null
     private var raiseBtn: Button? = null
     private var channel: Channel? = null
-    private val speakers = ArrayList<ChannelUser?>()
-    private val followedBySpeakers = ArrayList<ChannelUser?>()
-    private val otherUsers = ArrayList<ChannelUser?>()
+    private val speakers = List<ChannelUser?>()
+    private val followedBySpeakers = List<ChannelUser?>()
+    private val otherUsers = List<ChannelUser?>()
     private val mutedUsers = ArrayList<Int>()
     private val speakingUsers = ArrayList<Int>()
     override fun onAttach(activity: Activity) {
@@ -96,9 +96,9 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
     }
 
     override fun doLoadData(offset: Int, count: Int) {
-//		channel=VoiceService.getInstance().getChannel();
-//		setTitle(channel.topic);
-//		onDataLoaded(channel.users, false);
+// 		channel=VoiceService.getInstance().getChannel();
+// 		setTitle(channel.topic);
+// 		onDataLoaded(channel.users, false);
         GetChannel(channel!!.channel)
             .setCallback(object : SimpleCallback<Channel?>(this) {
                 override fun onSuccess(result: Channel) {
@@ -118,43 +118,54 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
     override fun getAdapter(): RecyclerView.Adapter<*> {
         if (adapter == null) {
             adapter = MergeRecyclerAdapter()
-            adapter!!.addAdapter(UserListAdapter(speakers,
-                View.generateViewId()).also { speakersAdapter = it })
+            adapter!!.addAdapter(
+                UserListAdapter(
+                    speakers,
+                    View.generateViewId()
+                ).also { speakersAdapter = it }
+            )
             adapter!!.addAdapter(SingleViewRecyclerAdapter(makeSectionHeader(R.string.followed_by_speakers)))
-            adapter!!.addAdapter(UserListAdapter(followedBySpeakers,
-                View.generateViewId()).also { followedAdapter = it })
+            adapter!!.addAdapter(
+                UserListAdapter(
+                    followedBySpeakers,
+                    View.generateViewId()
+                ).also { followedAdapter = it }
+            )
             adapter!!.addAdapter(SingleViewRecyclerAdapter(makeSectionHeader(R.string.others_in_room)))
-            adapter!!.addAdapter(UserListAdapter(otherUsers,
-                View.generateViewId()).also { othersAdapter = it })
+            adapter!!.addAdapter(
+                UserListAdapter(
+                    otherUsers,
+                    View.generateViewId()
+                ).also { othersAdapter = it }
+            )
         }
         return adapter!!
     }
 
     private fun onLeaveClick(v: View) {
-        VoiceService.Companion.getInstance().leaveChannel()
+        VoiceService.instance!!.leaveChannel()
         Nav.finish(this)
     }
 
     private fun onRaiseClick(v: View) {
-        val svc: VoiceService = VoiceService.Companion.getInstance()
-        if (svc.isHandRaised) svc.unraiseHand() else svc.raiseHand()
+        val svc = VoiceService.instance
+        if (svc!!.isHandRaised) svc!!.unraiseHand() else svc.raiseHand()
     }
 
     private fun onMuteClick(v: View) {
-        val svc: VoiceService = VoiceService.Companion.getInstance()
+        val svc = VoiceService.instance!!
         svc.isMuted = !svc.isMuted
         muteBtn!!.setImageResource(if (svc.isMuted) R.drawable.ic_mic_off else R.drawable.ic_mic)
         onUserMuteChanged(ClubhouseSession.userID!!.toInt(), svc.isMuted)
     }
 
     override fun onUserMuteChanged(id: Int, muted: Boolean) {
-        var i = 0
         if (muted) {
             if (!mutedUsers.contains(id)) mutedUsers.add(id)
         } else {
             mutedUsers.remove(id)
         }
-        for (user in speakers) {
+        for ((i, user) in speakers.withIndex()) {
             if (user!!.userId == id) {
                 user.isMuted = muted
                 val h = list.findViewHolderForAdapterPosition(i)
@@ -162,20 +173,23 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
                     h.muted.visibility = if (muted) View.VISIBLE else View.INVISIBLE
                 }
             }
-            i++
         }
     }
 
     override fun onUserJoined(user: ChannelUser) {
-        if (user.isSpeaker) {
-            speakers.add(user)
-            speakersAdapter!!.notifyItemInserted(speakers.size - 1)
-        } else if (user.isFollowedBySpeaker) {
-            followedBySpeakers.add(user)
-            followedAdapter!!.notifyItemInserted(followedBySpeakers.size - 1)
-        } else {
-            otherUsers.add(user)
-            othersAdapter!!.notifyItemInserted(otherUsers.size - 1)
+        when {
+            user.isSpeaker -> {
+                speakers.add(user)
+                speakersAdapter!!.notifyItemInserted(speakers.size - 1)
+            }
+            user.isFollowedBySpeaker -> {
+                followedBySpeakers.add(user)
+                followedAdapter!!.notifyItemInserted(followedBySpeakers.size - 1)
+            }
+            else -> {
+                otherUsers.add(user)
+                othersAdapter!!.notifyItemInserted(otherUsers.size - 1)
+            }
         }
     }
 
@@ -212,12 +226,12 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
     override fun onCanSpeak(inviterName: String?, inviterID: Int) {
         AlertDialog.Builder(activity)
             .setMessage(getString(R.string.confirm_join_as_speaker, inviterName))
-            .setPositiveButton(R.string.join) { dialogInterface, i ->
+            .setPositiveButton(R.string.join) { _, _ ->
                 AcceptSpeakerInvite(channel!!.channel, inviterID)
                     .wrapProgress(activity)
                     .setCallback(object : Callback<BaseResponse?> {
                         override fun onSuccess(result: BaseResponse?) {
-                            VoiceService.Companion.getInstance().rejoinChannel()
+                            VoiceService.instance!!.rejoinChannel()
                         }
 
                         override fun onError(error: ErrorResponse) {
@@ -238,11 +252,16 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
         otherUsers.clear()
         for (user in channel.users!!) {
             if (user!!.isMuted && !mutedUsers.contains(user.userId)) mutedUsers.add(user.userId)
-            if (user.isSpeaker) speakers.add(user) else if (user.isFollowedBySpeaker) followedBySpeakers.add(
-                user) else otherUsers.add(user)
+            when {
+                user.isSpeaker -> speakers.add(user)
+                user.isFollowedBySpeaker -> followedBySpeakers.add(
+                    user
+                )
+                else -> otherUsers.add(user)
+            }
         }
         onDataLoaded(channel.users, false)
-        val svc: VoiceService = VoiceService.Companion.getInstance()
+        val svc: VoiceService = VoiceService.instance!!
         raiseBtn!!.isEnabled = channel.isHandraiseEnabled
         raiseBtn!!.visibility = if (svc.isSelfSpeaker) View.GONE else View.VISIBLE
         muteBtn!!.visibility = if (svc.isSelfSpeaker) View.VISIBLE else View.GONE
@@ -251,15 +270,16 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
     override fun onSpeakingUsersChanged(ids: List<Int>?) {
         speakingUsers.clear()
         speakingUsers.addAll(ids!!)
-        var i = 0
-        for (user in speakers) {
+        for ((i, user) in speakers.withIndex()) {
             val h = list.findViewHolderForAdapterPosition(i)
             if (h is UserViewHolder) {
-                h.speakerBorder.setAlpha(if (speakingUsers.contains(
-                        user!!.userId)
-                ) 1 else 0.toFloat())
+                h.speakerBorder.alpha = (
+                    if (speakingUsers.contains(
+                            user!!.userId
+                        )
+                    ) 1 else 0.toFloat()
+                    ).toFloat()
             }
-            i++
         }
     }
 
@@ -290,22 +310,28 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
         }
     }
 
-    private inner class UserViewHolder(large: Boolean) : BindableViewHolder<ChannelUser>(
-        activity, R.layout.channel_user_cell, list), ImageLoaderViewHolder, Clickable {
-        private val photo: ImageView
-        val muted: ImageView
-        private val name: TextView
-        val speakerBorder: View
+    private inner class UserViewHolder(large: Boolean) :
+        BindableViewHolder<ChannelUser>(
+            activity, R.layout.channel_user_cell, list
+        ),
+        ImageLoaderViewHolder,
+        Clickable {
+        private val photo: ImageView = findViewById(R.id.photo)
+        val muted: ImageView = findViewById(R.id.muted)
+        private val name: TextView = findViewById(R.id.name)
+        val speakerBorder: View = findViewById(R.id.speaker_border)
         private val placeholder: Drawable = ColorDrawable(-0x7f7f80)
         override fun onBind(item: ChannelUser) {
-            if (item.isModerator) name.text = "✱ " + item.firstName else name.text = item.firstName
+            if (item.isModerator) name.text = "✱ ${item.firstName}" else name.text = item.firstName
             muted.visibility =
                 if (mutedUsers.contains(item.userId)) View.VISIBLE else View.INVISIBLE
-            speakerBorder.setAlpha(if (speakingUsers.contains(item.userId)) 1 else 0.toFloat())
+            speakerBorder.alpha =
+                (if (speakingUsers.contains(item.userId)) 1 else 0.toFloat()) as Float
             if (item.photoUrl == null) photo.setImageDrawable(placeholder) else imgLoader.bindViewHolder(
                 adapter,
                 this,
-                adapterPosition)
+                adapterPosition
+            )
         }
 
         override fun setImage(index: Int, bitmap: Bitmap) {
@@ -323,12 +349,8 @@ class InChannelFragment : BaseRecyclerFragment<ChannelUser?>(10), ChannelEventLi
         }
 
         init {
-            photo = findViewById(R.id.photo)
-            name = findViewById(R.id.name)
-            muted = findViewById(R.id.muted)
-            speakerBorder = findViewById(R.id.speaker_border)
             val lp = photo.layoutParams
-            lp.height = V.dp(if (large) 72 else 48.toFloat())
+            lp.height = V.dp((if (large) 72 else 48.toFloat()) as Float)
             lp.width = lp.height
             muted.visibility = View.INVISIBLE
             if (!large) speakerBorder.visibility = View.GONE else speakerBorder.alpha = 0f

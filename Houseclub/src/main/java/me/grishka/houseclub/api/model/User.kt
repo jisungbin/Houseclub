@@ -8,9 +8,8 @@ open class User : Parcelable {
     var name: String? = null
     var photoUrl: String? = null
     var username: String? = null
-    override fun describeContents(): Int {
-        return 0
-    }
+
+    override fun describeContents() = 0
 
     override fun writeToParcel(dest: Parcel, flags: Int) {
         dest.writeInt(userId)
@@ -26,7 +25,7 @@ open class User : Parcelable {
         username = source.readString()
     }
 
-    constructor() {}
+    constructor()
     protected constructor(`in`: Parcel) {
         userId = `in`.readInt()
         name = `in`.readString()
@@ -35,14 +34,9 @@ open class User : Parcelable {
     }
 
     companion object {
-        val CREATOR: Parcelable.Creator<User> = object : Parcelable.Creator<User?> {
-            override fun createFromParcel(source: Parcel): User? {
-                return User(source)
-            }
-
-            override fun newArray(size: Int): Array<User?> {
-                return arrayOfNulls(size)
-            }
+        @JvmField val CREATOR = object : Parcelable.Creator<User?> {
+            override fun createFromParcel(source: Parcel) = User(source)
+            override fun newArray(size: Int) = arrayOfNulls<User?>(size)
         }
     }
 }
