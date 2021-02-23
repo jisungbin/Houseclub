@@ -5,3 +5,5 @@
 1. Designed like iOS clubhouse.
 2. Migrated Java to Kotlin
 3. Code clean-up
+
+# Process in Developing
